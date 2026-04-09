@@ -9,15 +9,6 @@ const API = "http://127.0.0.1:8000";
 const posterCache = {};
 // ── Poster image with TMDB fetch ─────────────────────────────────────────────
 function Poster({ title, className }) {
-  // const [url, setUrl] = useState(null);
-  // const [loading, setLoading] = useState(true);
-
-  // useEffect(() => {
-  //   fetch(`${API}/poster?title=${encodeURIComponent(title)}`)
-  //     .then(r => r.json())
-  //     .then(d => { setUrl(d.poster_url); setLoading(false); })
-  //     .catch(() => setLoading(false));
-  // }, [title]);
   const [url, setUrl] = useState(posterCache[title] ?? null);
   const [loading, setLoading] = useState(!posterCache[title]);
 
