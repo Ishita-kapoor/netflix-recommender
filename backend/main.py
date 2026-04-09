@@ -4,7 +4,6 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sentence_transformers import SentenceTransformer
 from sklearn.preprocessing import normalize
 import numpy as np
 import pandas as pd
@@ -19,43 +18,56 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-print("Loading models...")
+# ── Lazy load on first request ───────────────────────────────────────────────
+models_loaded = False
+knn_hybrid = hybrid_features = tfidf_vectorizer = ohe = scaler = meta = all_titles = tmdb_config = sbert = None
 
-with open("models/knn_hybrid.pkl", "rb") as f:
-    knn_hybrid = pickle.load(f)
+def load_models():
+    global models_loaded, knn_hybrid, hybrid_features, tfidf_vectorizer
+    global ohe, scaler, meta, all_titles, tmdb_config, sbert
+    
+    if models_loaded:
+        return
+    
+    print("Loading models...")
+    import pickle, json
+    import numpy as np
+    
+    with open("models/knn_hybrid.pkl", "rb") as f:
+        knn_hybrid = pickle.load(f)
+    hybrid_features = np.load("models/hybrid_features.npy")
+    with open("models/tfidf_vectorizer.pkl", "rb") as f:
+        tfidf_vectorizer = pickle.load(f)
+    with open("models/ohe.pkl", "rb") as f:
+        ohe = pickle.load(f)
+    with open("models/scaler.pkl", "rb") as f:
+        scaler = pickle.load(f)
+    with open("models/titles_meta.pkl", "rb") as f:
+        meta = pickle.load(f)
+    with open("models/titles.json") as f:
+        all_titles = json.load(f)
+    with open("tmdb_config.json") as f:
+        tmdb_config = json.load(f)
+    
+    from sentence_transformers import SentenceTransformer
+    sbert = SentenceTransformer("all-MiniLM-L6-v2")
+    
+    global GENRE_MAP_MOVIE, GENRE_MAP_TV
+    GENRE_MAP_MOVIE = {int(k): v for k, v in tmdb_config["genre_map_movie"].items()}
+    GENRE_MAP_TV    = {int(k): v for k, v in tmdb_config["genre_map_tv"].items()}
+    
+    models_loaded = True
+    print("✅ All models loaded")
 
-hybrid_features = np.load("models/hybrid_features.npy")
-
-with open("models/tfidf_vectorizer.pkl", "rb") as f:
-    tfidf_vectorizer = pickle.load(f)
-
-with open("models/ohe.pkl", "rb") as f:
-    ohe = pickle.load(f)
-
-with open("models/scaler.pkl", "rb") as f:
-    scaler = pickle.load(f)
-
-with open("models/titles_meta.pkl", "rb") as f:
-    meta = pickle.load(f)
-
-with open("models/titles.json") as f:
-    all_titles = json.load(f)
-
-with open("tmdb_config.json") as f:
-    tmdb_config = json.load(f)
-
-sbert = SentenceTransformer("all-MiniLM-L6-v2")
-
+TMDB_API_KEY    = os.environ.get("TMDB_API_KEY", "")
+TMDB_BASE       = "https://api.themoviedb.org/3"
 W_GENRE    = 0.30
 W_SEMANTIC = 0.50
 W_METADATA = 0.20
 
-TMDB_API_KEY    = os.environ.get("TMDB_API_KEY", "")
-TMDB_BASE       = "https://api.themoviedb.org/3"
-GENRE_MAP_MOVIE = {int(k): v for k, v in tmdb_config["genre_map_movie"].items()}
-GENRE_MAP_TV    = {int(k): v for k, v in tmdb_config["genre_map_tv"].items()}
-
-print("✅ All models loaded")
+# These get set inside load_models() but need to exist globally
+GENRE_MAP_MOVIE = {}
+GENRE_MAP_TV    = {}
 
 
 def fetch_from_tmdb(title: str):
@@ -104,13 +116,18 @@ def build_vector(row: dict):
     meta_vec = np.hstack([meta_ohe, meta_numeric])
     return np.hstack([genre_vec * W_GENRE, desc_vec * W_SEMANTIC, meta_vec * W_METADATA])
 
+@app.get("/")
+def root():
+    return {"status": "ok"}
 
 @app.get("/titles")
 def get_titles():
+    load_models()
     return {"titles": all_titles}
 
 @app.get("/recommend")
 def recommend(title: str, n: int = 10, page: int = 0):
+    load_models()
     if not title or len(title.strip()) < 1:
         raise HTTPException(status_code=400, detail="Title required")
     if len(title) > 200:
@@ -166,6 +183,7 @@ def recommend(title: str, n: int = 10, page: int = 0):
     
 @app.get("/poster")
 def get_poster(title: str):
+    load_models()
     """
     Fetches poster URL from TMDB for a given title.
     Called per card so posters load progressively without slowing recommendations.
