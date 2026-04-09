@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useOutsideClick } from "@/hooks/use-outside-click";
 import "../app/globals.css";
 
-const API = "https://netflix-recommender-api-my7n.onrender.com";
+const API = "https://ishitakapoor-netflix-recommender.hf.space";
 const posterCache = {};
 // ── Poster image with TMDB fetch ─────────────────────────────────────────────
 function Poster({ title, className }) {
