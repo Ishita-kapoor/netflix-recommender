@@ -61,6 +61,14 @@ def load_models():
 
 TMDB_API_KEY    = os.environ.get("TMDB_API_KEY", "")
 TMDB_BASE       = "https://api.themoviedb.org/3"
+import threading
+
+@app.on_event("startup")
+async def startup():
+    # Load models in background thread so port opens immediately
+    thread = threading.Thread(target=load_models)
+    thread.daemon = True
+    thread.start()
 W_GENRE    = 0.30
 W_SEMANTIC = 0.50
 W_METADATA = 0.20
