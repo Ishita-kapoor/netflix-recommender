@@ -1,0 +1,37 @@
+{
+  "api_key_env_var": "TMDB_API_KEY",
+  "base_url": "https://api.themoviedb.org/3",
+  "genre_map_movie": {
+    "28": "Action",
+    "12": "Adventure",
+    "16": "Animation",
+    "35": "Comedies",
+    "80": "Crime",
+    "99": "Documentaries",
+    "18": "Dramas",
+    "10751": "Children & Family Movies",
+    "14": "Fantasy",
+    "27": "Horror Movies",
+    "10402": "Music & Musicals",
+    "9648": "Mystery",
+    "10749": "Romantic Movies",
+    "878": "Sci-Fi & Fantasy",
+    "53": "Thrillers",
+    "10752": "War",
+    "37": "Westerns"
+  },
+  "genre_map_tv": {
+    "10759": "Action & Adventure",
+    "16": "Animation",
+    "35": "Comedies",
+    "80": "Crime TV Shows",
+    "99": "Docuseries",
+    "18": "Dramas",
+    "10751": "Kids' TV",
+    "9648": "Mystery",
+    "10764": "Reality TV",
+    "10765": "Sci-Fi & Fantasy",
+    "10768": "War & Politics TV",
+    "37": "Westerns"
+  }
+}

@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+sentence-transformers
+scikit-learn==1.6.1
+numpy==1.26.4
+pandas
+requests
+python-dotenv
