@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CineMatch — Netflix Recommender</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #07090e;
+      --surface: #0d1017;
+      --surface2: #13181f;
+      --border: rgba(255,255,255,0.06);
+      --accent: #e63946;
+      --accent-dim: rgba(230,57,70,0.15);
+      --text: #e8eaf0;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --green: #4ade80;
+      --blue: #60a5fa;
+      --yellow: #fbbf24;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      overflow-x: hidden;
+      cursor: none;
+    }
+
+    /* Custom cursor */
+    #cursor {
+      position: fixed;
+      width: 10px; height: 10px;
+      background: var(--accent);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%);
+      transition: transform 0.1s ease, width 0.2s ease, height 0.2s ease, background 0.2s ease;
+      mix-blend-mode: difference;
+    }
+    #cursor-ring {
+      position: fixed;
+      width: 36px; height: 36px;
+      border: 1px solid rgba(230,57,70,0.5);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9998;
+      transform: translate(-50%, -50%);
+      transition: transform 0.18s ease, width 0.25s ease, height 0.25s ease, opacity 0.2s ease;
+    }
+    body:has(a:hover) #cursor,
+    body:has(button:hover) #cursor { width: 18px; height: 18px; }
+    body:has(a:hover) #cursor-ring,
+    body:has(button:hover) #cursor-ring { width: 56px; height: 56px; opacity: 0.4; }
+
+    /* Noise overlay */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.35;
+    }
+
+    /* ─── HERO ─────────────────────────────────────────── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      padding: clamp(3rem, 8vw, 7rem) clamp(2rem, 8vw, 8rem);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-glow {
+      position: absolute;
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(230,57,70,0.12) 0%, transparent 70%);
+      top: -200px; right: -150px;
+      pointer-events: none;
+      animation: pulse-glow 6s ease-in-out infinite alternate;
+    }
+    .hero-glow2 {
+      position: absolute;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(96,165,250,0.06) 0%, transparent 70%);
+      bottom: 100px; left: -100px;
+      pointer-events: none;
+      animation: pulse-glow 8s ease-in-out infinite alternate-reverse;
+    }
+    @keyframes pulse-glow {
+      from { opacity: 0.6; transform: scale(1); }
+      to   { opacity: 1;   transform: scale(1.1); }
+    }
+
+    .hero-eyebrow {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.2em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+      opacity: 0;
+      animation: fadeUp 0.7s ease forwards 0.2s;
+    }
+
+    .hero-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(5rem, 13vw, 11rem);
+      line-height: 0.9;
+      letter-spacing: 0.01em;
+      color: var(--text);
+      opacity: 0;
+      animation: fadeUp 0.8s ease forwards 0.4s;
+    }
+    .hero-title span { color: var(--accent); }
+
+    .hero-sub {
+      margin-top: 2rem;
+      font-size: clamp(1rem, 1.8vw, 1.2rem);
+      font-weight: 300;
+      color: var(--text-dim);
+      max-width: 520px;
+      line-height: 1.7;
+      opacity: 0;
+      animation: fadeUp 0.8s ease forwards 0.6s;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      margin-top: 3rem;
+      flex-wrap: wrap;
+      opacity: 0;
+      animation: fadeUp 0.8s ease forwards 0.8s;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--accent);
+      color: #fff;
+      text-decoration: none;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      font-size: 0.9rem;
+      letter-spacing: 0.04em;
+      padding: 0.85rem 2rem;
+      border: none;
+      cursor: none;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-primary::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: rgba(255,255,255,0.12);
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+    }
+    .btn-primary:hover::after { transform: translateX(0); }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(230,57,70,0.35);
+    }
+
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: transparent;
+      color: var(--text-dim);
+      text-decoration: none;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 400;
+      font-size: 0.9rem;
+      letter-spacing: 0.04em;
+      padding: 0.85rem 2rem;
+      border: 1px solid var(--border);
+      cursor: none;
+      transition: color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+    .btn-ghost:hover {
+      color: var(--text);
+      border-color: rgba(255,255,255,0.2);
+      transform: translateY(-2px);
+    }
+
+    .scroll-hint {
+      position: absolute;
+      bottom: 2.5rem;
+      left: clamp(2rem, 8vw, 8rem);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.18em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      opacity: 0;
+      animation: fadeUp 0.8s ease forwards 1.2s;
+    }
+    .scroll-hint::before {
+      content: '';
+      display: block;
+      width: 1px;
+      height: 40px;
+      background: linear-gradient(to bottom, transparent, var(--text-muted));
+      animation: scroll-line 2s ease-in-out infinite;
+    }
+    @keyframes scroll-line {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── SECTION COMMON ──────────────────────────────── */
+    section {
+      padding: clamp(4rem, 8vw, 7rem) clamp(2rem, 8vw, 8rem);
+      border-top: 1px solid var(--border);
+    }
+
+    .section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.2em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    .section-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      letter-spacing: 0.02em;
+      line-height: 1;
+      color: var(--text);
+      margin-bottom: 3rem;
+    }
+
+    /* ─── STACK ───────────────────────────────────────── */
+    .stack-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1px;
+      border: 1px solid var(--border);
+    }
+
+    .stack-item {
+      padding: 2rem 1.75rem;
+      background: var(--surface);
+      position: relative;
+      overflow: hidden;
+      transition: background 0.25s ease;
+    }
+    .stack-item::before {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--item-color, var(--accent));
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.3s ease;
+    }
+    .stack-item:hover { background: var(--surface2); }
+    .stack-item:hover::before { transform: scaleX(1); }
+
+    .stack-icon {
+      font-size: 1.6rem;
+      margin-bottom: 0.75rem;
+    }
+    .stack-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.3rem;
+      letter-spacing: 0.05em;
+      color: var(--text);
+      margin-bottom: 0.4rem;
+    }
+    .stack-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .stack-tag {
+      display: inline-block;
+      margin-top: 0.75rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      padding: 0.25rem 0.6rem;
+      background: var(--accent-dim);
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    .stack-tag.blue  { background: rgba(96,165,250,0.1); color: var(--blue); }
+    .stack-tag.green { background: rgba(74,222,128,0.1); color: var(--green); }
+    .stack-tag.yellow{ background: rgba(251,191,36,0.1); color: var(--yellow); }
+
+    /* ─── MODEL ───────────────────────────────────────── */
+    .model-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: start;
+    }
+    @media (max-width: 768px) {
+      .model-layout { grid-template-columns: 1fr; }
+    }
+
+    .model-text p {
+      font-size: 0.95rem;
+      color: var(--text-dim);
+      line-height: 1.85;
+      margin-bottom: 1.2rem;
+    }
+    .model-text strong { color: var(--text); font-weight: 500; }
+
+    .feature-rows { display: flex; flex-direction: column; gap: 1rem; }
+
+    .feature-row {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 1.25rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s ease;
+    }
+    .feature-row:hover { border-color: rgba(255,255,255,0.14); }
+
+    .feature-row-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.6rem;
+    }
+    .feature-row-name {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--text);
+      letter-spacing: 0.05em;
+    }
+    .feature-row-weight {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.4rem;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+    }
+    .feature-row-desc {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+    .feature-bar-bg {
+      height: 3px;
+      background: var(--border);
+      width: 100%;
+    }
+    .feature-bar-fill {
+      height: 100%;
+      background: var(--bar-color, var(--accent));
+      width: 0;
+      transition: width 1.2s cubic-bezier(0.16,1,0.3,1);
+    }
+    .feature-bar-fill.animated { width: var(--bar-width); }
+
+    /* ─── EVAL ────────────────────────────────────────── */
+    .eval-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .eval-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 2rem;
+      position: relative;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .eval-card:hover { transform: translateY(-4px); border-color: rgba(255,255,255,0.12); }
+    .eval-card-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+    .eval-card-value {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 3.2rem;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      color: var(--val-color, var(--text));
+      margin-bottom: 0.5rem;
+    }
+    .eval-card-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .eval-verdict {
+      margin-top: 2rem;
+      padding: 1.5rem 2rem;
+      background: rgba(74,222,128,0.05);
+      border: 1px solid rgba(74,222,128,0.15);
+      font-size: 0.9rem;
+      color: var(--text-dim);
+      line-height: 1.75;
+    }
+    .eval-verdict strong { color: var(--green); font-weight: 500; }
+
+    /* ─── ARCH ────────────────────────────────────────── */
+    .arch-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      max-width: 580px;
+    }
+
+    .arch-node {
+      display: flex;
+      align-items: flex-start;
+      gap: 1.5rem;
+      position: relative;
+      padding-bottom: 2rem;
+    }
+    .arch-node:last-child { padding-bottom: 0; }
+    .arch-node:last-child .arch-line { display: none; }
+
+    .arch-dot-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .arch-dot {
+      width: 36px; height: 36px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.95rem;
+      flex-shrink: 0;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .arch-node:hover .arch-dot {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+    .arch-line {
+      width: 1px;
+      flex: 1;
+      min-height: 24px;
+      background: linear-gradient(to bottom, var(--border), transparent);
+      margin-top: 4px;
+    }
+
+    .arch-content { padding-top: 0.4rem; }
+    .arch-title {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      font-size: 0.95rem;
+      color: var(--text);
+      margin-bottom: 0.3rem;
+    }
+    .arch-desc {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    /* ─── LINKS ───────────────────────────────────────── */
+    .links-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1px;
+      border: 1px solid var(--border);
+    }
+
+    .link-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 2rem;
+      background: var(--surface);
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.2s ease;
+      position: relative;
+      overflow: hidden;
+      min-height: 160px;
+    }
+    .link-card::after {
+      content: '↗';
+      position: absolute;
+      top: 1.5rem; right: 1.75rem;
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      transition: transform 0.2s ease, color 0.2s ease;
+    }
+    .link-card:hover { background: var(--surface2); }
+    .link-card:hover::after { transform: translate(3px, -3px); color: var(--text); }
+    .link-card-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+    .link-card-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.6rem;
+      letter-spacing: 0.04em;
+      color: var(--text);
+    }
+    .link-card-url {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      margin-top: auto;
+      padding-top: 1rem;
+      word-break: break-all;
+    }
+
+    /* ─── FOOTER ──────────────────────────────────────── */
+    footer {
+      padding: 3rem clamp(2rem, 8vw, 8rem);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .footer-left {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.4rem;
+      letter-spacing: 0.05em;
+      color: var(--text);
+    }
+    .footer-left span { color: var(--accent); }
+    .footer-right {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      text-align: right;
+      line-height: 1.8;
+    }
+
+    /* Intersection observer fade-in */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+    .reveal-delay-4 { transition-delay: 0.4s; }
+  </style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+
+<!-- ─── HERO ─────────────────────────────────────────── -->
+<section class="hero" style="border-top: none;">
+  <div class="hero-glow"></div>
+  <div class="hero-glow2"></div>
+
+  <p class="hero-eyebrow">ML Project · VIT Vellore '26</p>
+  <h1 class="hero-title">Cine<span>Match</span></h1>
+  <p class="hero-sub">
+    A hybrid ML-powered Netflix recommendation engine. Type any show or movie — get 10 semantically matched recommendations using TF-IDF, Sentence-BERT, and KNN.
+  </p>
+  <div class="hero-actions">
+    <a href="https://netflix-show-recommender-3ltsta73g.vercel.app" target="_blank" class="btn-primary">
+      ▶ &nbsp;Launch App
+    </a>
+    <a href="https://github.com/Ishita-kapoor/netflix-recommender" target="_blank" class="btn-ghost">
+      ⌥ &nbsp;View Source
+    </a>
+  </div>
+
+  <p class="scroll-hint">Scroll to explore</p>
+</section>
+
+<!-- ─── TECH STACK ─────────────────────────────────── -->
+<section>
+  <p class="section-label reveal">Stack</p>
+  <h2 class="section-title reveal reveal-delay-1">Built With</h2>
+
+  <div class="stack-grid">
+    <div class="stack-item reveal" style="--item-color: #e63946;">
+      <div class="stack-icon">🐍</div>
+      <div class="stack-name">Python</div>
+      <div class="stack-desc">Backend API, ML model training, data preprocessing pipeline</div>
+      <span class="stack-tag">Backend</span>
+    </div>
+    <div class="stack-item reveal reveal-delay-1" style="--item-color: #60a5fa;">
+      <div class="stack-icon">⚡</div>
+      <div class="stack-name">FastAPI</div>
+      <div class="stack-desc">REST endpoints for recommendations, title autocomplete, and poster fetching</div>
+      <span class="stack-tag blue">API</span>
+    </div>
+    <div class="stack-item reveal reveal-delay-2" style="--item-color: #4ade80;">
+      <div class="stack-icon">▲</div>
+      <div class="stack-name">Next.js</div>
+      <div class="stack-desc">App Router, React 19, server components, deployed on Vercel</div>
+      <span class="stack-tag green">Frontend</span>
+    </div>
+    <div class="stack-item reveal reveal-delay-3" style="--item-color: #fbbf24;">
+      <div class="stack-icon">🤗</div>
+      <div class="stack-name">HuggingFace</div>
+      <div class="stack-desc">Sentence-BERT embeddings + Spaces Docker deployment for the backend</div>
+      <span class="stack-tag yellow">ML</span>
+    </div>
+    <div class="stack-item reveal reveal-delay-1" style="--item-color: #a78bfa;">
+      <div class="stack-icon">📐</div>
+      <div class="stack-name">Tailwind CSS</div>
+      <div class="stack-desc">Utility-first CSS framework for the dark cinematic frontend design</div>
+      <span class="stack-tag" style="background:rgba(167,139,250,0.1);color:#a78bfa;">CSS</span>
+    </div>
+    <div class="stack-item reveal reveal-delay-2" style="--item-color: #fb923c;">
+      <div class="stack-icon">🎬</div>
+      <div class="stack-name">TMDB API</div>
+      <div class="stack-desc">Live metadata + poster fetching for shows released after 2021</div>
+      <span class="stack-tag" style="background:rgba(251,146,60,0.1);color:#fb923c;">External</span>
+    </div>
+  </div>
+</section>
+
+<!-- ─── ML MODEL ───────────────────────────────────── -->
+<section>
+  <p class="section-label reveal">Machine Learning</p>
+  <h2 class="section-title reveal reveal-delay-1">How the Model Works</h2>
+
+  <div class="model-layout">
+    <div class="model-text reveal reveal-delay-2">
+      <p>
+        The recommender uses a <strong>hybrid KNN model</strong> combining three complementary signals — genre labels, semantic meaning, and structural metadata — into a single weighted feature matrix.
+      </p>
+      <p>
+        Each show is represented as a vector. The model runs <strong>cosine similarity</strong> across ~8,800 Netflix titles using scikit-learn's <code style="font-family:'DM Mono',monospace;font-size:0.85em;color:var(--accent);">NearestNeighbors</code> to find the 50 closest matches, then paginates them in sets of 10.
+      </p>
+      <p>
+        For titles not in the 2021 dataset, a <strong>TMDB fallback</strong> fetches live genre and description data, builds a feature vector using the same fitted transformers, and queries it against the local KNN index in real time.
+      </p>
+    </div>
+
+    <div class="feature-rows reveal reveal-delay-3">
+      <div class="feature-row">
+        <div class="feature-row-header">
+          <span class="feature-row-name">TF-IDF · Genre Labels</span>
+          <span class="feature-row-weight">30%</span>
+        </div>
+        <div class="feature-row-desc">Bigram TF-IDF on the <code style="font-family:'DM Mono',monospace;font-size:0.85em;">listed_in</code> column · 50 features</div>
+        <div class="feature-bar-bg"><div class="feature-bar-fill" style="--bar-color:#e63946;--bar-width:30%;"></div></div>
+      </div>
+
+      <div class="feature-row">
+        <div class="feature-row-header">
+          <span class="feature-row-name">Sentence-BERT · Description</span>
+          <span class="feature-row-weight">50%</span>
+        </div>
+        <div class="feature-row-desc">all-MiniLM-L6-v2 · 384-dim embeddings · L2 normalized</div>
+        <div class="feature-bar-bg"><div class="feature-bar-fill" style="--bar-color:#60a5fa;--bar-width:50%;"></div></div>
+      </div>
+
+      <div class="feature-row">
+        <div class="feature-row-header">
+          <span class="feature-row-name">Metadata · OHE + Scaled</span>
+          <span class="feature-row-weight">20%</span>
+        </div>
+        <div class="feature-row-desc">Type, rating (OHE) + release year, duration (StandardScaler)</div>
+        <div class="feature-bar-bg"><div class="feature-bar-fill" style="--bar-color:#4ade80;--bar-width:20%;"></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── EVALUATION ─────────────────────────────────── -->
+<section>
+  <p class="section-label reveal">Evaluation</p>
+  <h2 class="section-title reveal reveal-delay-1">Model Performance</h2>
+
+  <div class="eval-grid">
+    <div class="eval-card reveal" style="--val-color:#e63946;">
+      <div class="eval-card-label">TF-IDF Baseline · Genre Accuracy</div>
+      <div class="eval-card-value">89.3%</div>
+      <div class="eval-card-sub">High label accuracy — but essentially just a genre filter. Diversity distance of only 0.0046.</div>
+    </div>
+    <div class="eval-card reveal reveal-delay-1" style="--val-color:#60a5fa;">
+      <div class="eval-card-label">Hybrid Model · Genre Accuracy</div>
+      <div class="eval-card-value">67.7%</div>
+      <div class="eval-card-sub">Lower label accuracy — intentionally. The model recommends across genre boundaries when narratives are similar.</div>
+    </div>
+    <div class="eval-card reveal reveal-delay-2" style="--val-color:#4ade80;">
+      <div class="eval-card-label">Hybrid Model · Diversity Distance</div>
+      <div class="eval-card-value">0.44</div>
+      <div class="eval-card-sub">vs 0.0046 for TF-IDF baseline. 95× more diverse — finds semantically meaningful recommendations.</div>
+    </div>
+    <div class="eval-card reveal reveal-delay-3" style="--val-color:#fbbf24;">
+      <div class="eval-card-label">Dataset Size</div>
+      <div class="eval-card-value">8,800</div>
+      <div class="eval-card-sub">Netflix shows and movies from Kaggle CSV. Data covers content up to 2021.</div>
+    </div>
+  </div>
+
+  <div class="eval-verdict reveal reveal-delay-2">
+    <strong>Key insight:</strong> the 22% drop in genre accuracy is a feature, not a bug. A pure genre filter would just return the same category. The hybrid model crosses genre lines when the narrative, tone, or themes are similar — which is how humans actually recommend shows.
+  </div>
+</section>
+
+<!-- ─── ARCHITECTURE ───────────────────────────────── -->
+<section>
+  <p class="section-label reveal">Architecture</p>
+  <h2 class="section-title reveal reveal-delay-1">Request Flow</h2>
+
+  <div class="arch-flow reveal reveal-delay-2">
+    <div class="arch-node">
+      <div class="arch-dot-wrap">
+        <div class="arch-dot">🌐</div>
+        <div class="arch-line"></div>
+      </div>
+      <div class="arch-content">
+        <div class="arch-title">User Browser</div>
+        <div class="arch-desc">Types a show title → autocomplete fetches from <code style="font-family:'DM Mono',monospace;font-size:0.85em;">/titles</code> endpoint → selects and submits</div>
+      </div>
+    </div>
+    <div class="arch-node">
+      <div class="arch-dot-wrap">
+        <div class="arch-dot">▲</div>
+        <div class="arch-line"></div>
+      </div>
+      <div class="arch-content">
+        <div class="arch-title">Vercel — Next.js Frontend</div>
+        <div class="arch-desc">Renders the UI, calls the FastAPI backend, handles pagination state and poster progressive loading</div>
+      </div>
+    </div>
+    <div class="arch-node">
+      <div class="arch-dot-wrap">
+        <div class="arch-dot">🤗</div>
+        <div class="arch-line"></div>
+      </div>
+      <div class="arch-content">
+        <div class="arch-title">HuggingFace Spaces — FastAPI Backend</div>
+        <div class="arch-desc">Docker-deployed Python service. Loads KNN model on startup. Routes to local DB or TMDB depending on whether the title exists in the 2021 dataset</div>
+      </div>
+    </div>
+    <div class="arch-node">
+      <div class="arch-dot-wrap">
+        <div class="arch-dot">🎬</div>
+        <div class="arch-line"></div>
+      </div>
+      <div class="arch-content">
+        <div class="arch-title">TMDB API (fallback)</div>
+        <div class="arch-desc">For post-2021 titles: fetches genres + description, builds live feature vector using same fitted transformers, queries local KNN index</div>
+      </div>
+    </div>
+    <div class="arch-node">
+      <div class="arch-dot-wrap">
+        <div class="arch-dot">🧠</div>
+      </div>
+      <div class="arch-content">
+        <div class="arch-title">KNN Model — Local Index</div>
+        <div class="arch-desc">Cosine similarity over 8,800 pre-computed hybrid vectors. Returns 50 neighbors, paginated in sets of 10 per request</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── LINKS ──────────────────────────────────────── -->
+<section>
+  <p class="section-label reveal">Links</p>
+  <h2 class="section-title reveal reveal-delay-1">Find the Project</h2>
+
+  <div class="links-grid">
+    <a href="https://netflix-show-recommender-3ltsta73g.vercel.app" target="_blank" class="link-card reveal">
+      <div>
+        <div class="link-card-label">Live App</div>
+        <div class="link-card-title">Frontend</div>
+      </div>
+      <div class="link-card-url">netflix-show-recommender-3ltsta73g.vercel.app</div>
+    </a>
+    <a href="https://huggingface.co/spaces/ishitakapoor/netflix-recommender" target="_blank" class="link-card reveal reveal-delay-1">
+      <div>
+        <div class="link-card-label">Backend API</div>
+        <div class="link-card-title">HuggingFace Space</div>
+      </div>
+      <div class="link-card-url">huggingface.co/spaces/ishitakapoor/netflix-recommender</div>
+    </a>
+    <a href="https://github.com/Ishita-kapoor/netflix-recommender" target="_blank" class="link-card reveal reveal-delay-2">
+      <div>
+        <div class="link-card-label">Source Code</div>
+        <div class="link-card-title">GitHub Repo</div>
+      </div>
+      <div class="link-card-url">github.com/Ishita-kapoor/netflix-recommender</div>
+    </a>
+    <a href="https://ishitakapoor-netflix-recommender.hf.space/docs" target="_blank" class="link-card reveal reveal-delay-3">
+      <div>
+        <div class="link-card-label">API Reference</div>
+        <div class="link-card-title">FastAPI Docs</div>
+      </div>
+      <div class="link-card-url">ishitakapoor-netflix-recommender.hf.space/docs</div>
+    </a>
+  </div>
+</section>
+
+<!-- ─── FOOTER ─────────────────────────────────────── -->
+<footer>
+  <div class="footer-left">Cine<span>Match</span></div>
+  <div class="footer-right">
+    Ishita Kapoor · VIT Vellore '26<br/>
+    ML Project · Powered by TMDB API<br/>
+    Data: Kaggle Netflix Titles CSV
+  </div>
+</footer>
+
+<script>
+  // Custom cursor
+  const cursor = document.getElementById('cursor');
+  const ring = document.getElementById('cursor-ring');
+  let mx = 0, my = 0, rx = 0, ry = 0;
+
+  document.addEventListener('mousemove', e => {
+    mx = e.clientX; my = e.clientY;
+    cursor.style.left = mx + 'px';
+    cursor.style.top  = my + 'px';
+  });
+
+  function lerpCursor() {
+    rx += (mx - rx) * 0.12;
+    ry += (my - ry) * 0.12;
+    ring.style.left = rx + 'px';
+    ring.style.top  = ry + 'px';
+    requestAnimationFrame(lerpCursor);
+  }
+  lerpCursor();
+
+  // Intersection observer for reveals
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        // Animate bars when feature section visible
+        entry.target.querySelectorAll('.feature-bar-fill').forEach(bar => {
+          bar.classList.add('animated');
+        });
+      }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  // Also observe feature rows directly for bar animation
+  document.querySelectorAll('.feature-row').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
