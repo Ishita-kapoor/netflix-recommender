@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'Netflix Recommender',
-  description: 'AI-powered show & movie recommendations',
+  title: 'CineMatch',
+  description: 'AI-powered show & movie recommendations with Hybrid KNN',
 }
 
 export default function RootLayout({ children }) {
